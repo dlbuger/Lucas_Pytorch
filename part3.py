@@ -8,7 +8,8 @@ from torchtext.vocab import GloVe
 from imdb_dataloader import IMDB
 
 
-# Class for creating the neural network.
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 # Class for creating the neural network.
 class Network(tnn.Module):
     def __init__(self):
@@ -20,6 +21,7 @@ class Network(tnn.Module):
         self.norm1 = tnn.BatchNorm1d(200)
         self.dense2 = tnn.Linear(200, 128)
         self.dense3 = tnn.Linear(128,64)
+        self.norm2 = tnn.BatchNorm1d(64)
         self.dense4 = tnn.Linear(64,1)
 
     def forward(self, input, length):
@@ -27,20 +29,22 @@ class Network(tnn.Module):
         DO NOT MODIFY FUNCTION SIGNATURE
         Create the forward pass through the network.
         """
-        o,(h_n,h_c) = self.lstm1(input)#[0][-1].view(-1,300)
+        o,(h_n,h_c) = self.lstm1(input)
         x = self.selu(o[:,-1,:].view(-1,300))
         x = self.dense1(x)
         x = self.norm1(x)
-        x = self.dropout(x)
+        #x += (torch.randn(x.shape[1])*0.15).to(device)
+        #x = self.dropout(x)
         x = self.dense2(x)
-        x = self.dropout(x)
+        #x = self.dropout(x)
         x = self.selu(x)
         x = self.dense3(x)
-        x = self.dropout(x)
+        x = self.norm2(x)
+        #x = self.dropout(x)
         x = self.dense4(x)
 
         
-        return x.view(-1)
+        return (x).view(-1)
 
 
 
@@ -62,7 +66,9 @@ def lossFunc():
     add a sigmoid to the output and calculate the binary cross-entropy.
     """
     return tnn.BCELoss()
-    
+
+
+
 def main():
     # Use a GPU if available, as it should be faster.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -85,8 +91,8 @@ def main():
     net = Network().to(device)
     criterion =lossFunc()
     optimiser = topti.Adam(net.parameters(), lr=0.001)  # Minimise the loss using the Adam algorithm.
-    scheduler = torch.optim.lr_scheduler.StepLR(optimiser,step_size=6, gamma=0.7)
-
+    # scheduler = torch.optim.lr_scheduler.StepLR(optimiser,step_size=6, gamma=0.7)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimiser,10)
     for epoch in range(30):
         running_loss = 0
 
